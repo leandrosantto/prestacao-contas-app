@@ -1,5 +1,5 @@
 // ============ App Prestação de Contas (iPhone / PWA) ============
-const VERSAO = "3.1.0 — 22/07/2026";
+const VERSAO = "3.1.1 — 22/07/2026";
 const $ = id => document.getElementById(id);
 document.getElementById("ver").textContent = "v" + VERSAO.split(" ")[0];
 document.getElementById("footer").innerHTML =

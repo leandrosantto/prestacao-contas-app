@@ -124,9 +124,20 @@
   <!-- 3. Notinhas -->
   <div class="card">
     <h2><span class="n">3</span> Notinhas</h2>
-    <button class="btn" id="btnFoto">📷 Escanear / fotografar notinhas</button>
+    <button class="btn" id="btnFoto">📷 Adicionar notinhas</button>
     <input type="file" id="file" accept="image/*,application/pdf" multiple>
-    <div class="hint">Toque e escolha <b>Escanear Documentos</b> pra digitalizar vários de uma vez (vira um PDF que o app separa em notas), ou <b>Tirar Foto</b> / <b>Fototeca</b>.</div>
+    <details style="margin-top:10px">
+      <summary>Como adicionar várias de uma vez</summary>
+      <div class="hint">
+        <b>Já escaneou?</b> Escaneie no app <b>Arquivos</b> ou <b>Notas</b> (⋯ → Escanear Documentos).
+        Ele salva <b>um PDF com todas</b>. Aqui, toque no botão → <b>Escolher Arquivos</b> → selecione o PDF:
+        o app separa <b>cada página numa nota</b>.<br><br>
+        <b>Prefere fotos?</b> Tire as fotos pela câmera e depois toque no botão →
+        <b>Biblioteca de fotos</b> → dá pra <b>marcar várias</b> de uma vez.<br><br>
+        <span style="opacity:.8">Obs.: o iPhone não deixa sites abrirem o scanner direto — por isso o
+        atalho é escanear no Arquivos/Notas e trazer o PDF pra cá.</span>
+      </div>
+    </details>
     <div id="status"></div>
   </div>
 
