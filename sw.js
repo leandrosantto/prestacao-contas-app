@@ -1,5 +1,5 @@
 // Service worker — deixa o app funcionar offline.
-const VERSION = "pc-v3.0.1";
+const VERSION = "pc-v3.0.2";
 const SHELL = [
   "./", "./index.html", "./extract.js", "./cover.js", "./app.js",
   "./manifest.json", "./logo.png", "./icon-192.png", "./icon-512.png", "./icon-180.png",
