@@ -26,10 +26,12 @@
   .card h2 .n{background:var(--azul);color:#fff;width:21px;height:21px;border-radius:50%;
               display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 auto}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+  .row>div{min-width:0}
   .full{grid-column:1/3}
   label{display:block;font-size:11.5px;color:var(--mut);margin-bottom:4px;font-weight:600}
-  input,select{width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:9px;
-       font-size:16px;font-family:inherit;background:#fff}
+  input,select{width:100%;min-width:0;max-width:100%;padding:11px 12px;border:1px solid var(--bd);
+       border-radius:9px;font-size:16px;font-family:inherit;background:#fff;-webkit-appearance:none;appearance:none}
+  input[type=date]{min-height:44px}
   input:focus,select:focus{outline:none;border-color:var(--azul2)}
   .radio{display:flex;gap:16px;align-items:center}
   .radio label{display:flex;align-items:center;gap:6px;margin:0;font-size:14px;color:var(--txt);font-weight:500}
@@ -47,7 +49,8 @@
   .nota{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--bd)}
   .nota:last-child{border-bottom:none}
   .nota img{width:52px;height:52px;object-fit:cover;border-radius:7px;border:1px solid var(--bd);flex:0 0 auto}
-  .nota .campos{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .nota .campos{flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .nota .campos>*{min-width:0}
   .nota .campos .fw{grid-column:1/3}
   .nota input,.nota select{padding:8px 9px;font-size:14px}
   .hide{display:none}
