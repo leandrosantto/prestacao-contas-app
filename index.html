@@ -124,8 +124,9 @@
   <!-- 3. Notinhas -->
   <div class="card">
     <h2><span class="n">3</span> Notinhas</h2>
-    <button class="btn" id="btnFoto">📷 Fotografar / escolher notinha</button>
-    <input type="file" id="file" accept="image/*" capture="environment" multiple>
+    <button class="btn" id="btnFoto">📷 Escanear / fotografar notinhas</button>
+    <input type="file" id="file" accept="image/*,application/pdf" multiple>
+    <div class="hint">Toque e escolha <b>Escanear Documentos</b> pra digitalizar vários de uma vez (vira um PDF que o app separa em notas), ou <b>Tirar Foto</b> / <b>Fototeca</b>.</div>
     <div id="status"></div>
   </div>
 
@@ -157,6 +158,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="extract.js"></script>
 <script src="cover.js"></script>
 <script src="app.js"></script>

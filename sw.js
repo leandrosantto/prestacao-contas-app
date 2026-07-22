@@ -1,10 +1,12 @@
 // Service worker — deixa o app funcionar offline.
-const VERSION = "pc-v3.0.2";
+const VERSION = "pc-v3.1.0";
 const SHELL = [
   "./", "./index.html", "./extract.js", "./cover.js", "./app.js",
   "./manifest.json", "./logo.png", "./icon-192.png", "./icon-512.png", "./icon-180.png",
   "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
   "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
 ];
 
 self.addEventListener("install", e => {

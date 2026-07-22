@@ -1,5 +1,5 @@
 // ============ App Prestação de Contas (iPhone / PWA) ============
-const VERSAO = "3.0.2 — 22/07/2026";
+const VERSAO = "3.1.0 — 22/07/2026";
 const $ = id => document.getElementById(id);
 document.getElementById("ver").textContent = "v" + VERSAO.split(" ")[0];
 document.getElementById("footer").innerHTML =
@@ -38,6 +38,11 @@ function toggleLayout(){
 $("btnFoto").onclick = ()=> $("file").click();
 $("file").onchange = e => { const fs=[...e.target.files]; e.target.value=""; if(fs.length) lerNotas(fs); };
 
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+}
+
 async function redimensionar(file){
   const img = await createImageBitmap(file);
   const max=1500, m=Math.max(img.width,img.height), f=m>max?max/m:1;
@@ -46,13 +51,67 @@ async function redimensionar(file){
   return c;
 }
 
+// extrai as imagens JPEG embutidas no PDF (caso do scanner do iPhone) — sem render
+async function extrairImagensEmbutidas(bytes){
+  const pdf = await PDFLib.PDFDocument.load(bytes, {ignoreEncryption:true});
+  const imgs=[];
+  for(const [ref,obj] of pdf.context.enumerateIndirectObjects()){
+    const d = obj && obj.dict; if(!d || !obj.contents) continue;
+    const sub = d.get(PDFLib.PDFName.of("Subtype"));
+    const filt = d.get(PDFLib.PDFName.of("Filter"));
+    if(sub && sub.toString()==="/Image" && filt && filt.toString().includes("DCTDecode")){
+      imgs.push(obj.contents);
+    }
+  }
+  return imgs;
+}
+
+// PDF (ex.: scanner do iPhone) -> uma imagem por página
+async function pdfParaCanvases(file){
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  // 1) caminho principal: extrair as fotos embutidas (scanner). Rápido e robusto.
+  try{
+    const imgs = await extrairImagensEmbutidas(bytes);
+    if(imgs.length){
+      const out=[];
+      for(const b of imgs){ try{ out.push(await redimensionar(new Blob([b],{type:"image/jpeg"}))); }catch(e){} }
+      if(out.length) return out;
+    }
+  }catch(e){}
+  // 2) reserva: PDF de texto (sem imagem) -> renderiza via pdf.js
+  const pdf = await pdfjsLib.getDocument({data:bytes}).promise;
+  const out=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const base = page.getViewport({scale:1});
+    const scale = Math.min(1600/Math.max(base.width,base.height), 3);
+    const vp = page.getViewport({scale});
+    const c=document.createElement("canvas"); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+    await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+    out.push(c);
+  }
+  return out;
+}
+
 async function lerNotas(files){
-  let worker = await Tesseract.createWorker('por');
-  for(let i=0;i<files.length;i++){
-    $("status").innerHTML = `<span class="spin"></span> Lendo nota ${i+1} de ${files.length}…`
+  // expande arquivos em imagens (cada página de PDF vira uma nota)
+  $("status").innerHTML='<span class="spin"></span> Preparando…';
+  let itens=[];
+  for(const f of files){
+    if(f.type==="application/pdf" || /\.pdf$/i.test(f.name)){
+      try{ (await pdfParaCanvases(f)).forEach(c=>itens.push(c)); }catch(e){}
+    }else{
+      try{ itens.push(await redimensionar(f)); }catch(e){}
+    }
+  }
+  if(!itens.length){ $("status").innerHTML='<span class="err">Nenhuma imagem encontrada nesse arquivo.</span>'; return; }
+
+  const worker = await Tesseract.createWorker('por');
+  for(let i=0;i<itens.length;i++){
+    $("status").innerHTML = `<span class="spin"></span> Lendo nota ${i+1} de ${itens.length}…`
       + (i===0 ? " (a 1ª baixa o motor, aguarde)" : "");
     try{
-      const canvas = await redimensionar(files[i]);
+      const canvas = itens[i];
       const img = canvas.toDataURL("image/jpeg", 0.8);
       const { data } = await worker.recognize(canvas);
       const ex = window.PC.extrair(data.text || "");
@@ -65,7 +124,7 @@ async function lerNotas(files){
     }
   }
   await worker.terminate();
-  $("status").innerHTML = `<span class="ok">✓ ${files.length} nota(s) lida(s).</span>`;
+  $("status").innerHTML = `<span class="ok">✓ ${itens.length} nota(s) lida(s).</span>`;
 }
 
 // ---------- tabela de revisão ----------
