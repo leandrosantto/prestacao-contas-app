@@ -1,0 +1,159 @@
+// ============ App Prestação de Contas (iPhone / PWA) ============
+const VERSAO = "3.0 — 22/07/2026";
+const $ = id => document.getElementById(id);
+document.getElementById("ver").textContent = "v" + VERSAO.split(" ")[0];
+document.getElementById("footer").innerHTML =
+  "Desenvolvido por <b>Leandro de Oliveira Santos</b> · v" + VERSAO;
+
+let RECEIPTS = [];   // {img(dataURL), data, valor, categoria, justificativa, texto}
+let KM = [];
+
+// ---------- persistência dos dados pessoais (fica no aparelho) ----------
+const PERSIST = ["nome","cpf","depto","banco","agencia","conta","pix","assinatura_nome","km_taxa"];
+function carregarDados(){
+  PERSIST.forEach(k=>{ const v=localStorage.getItem("pc_"+k); if(v!=null && $(k)) $(k).value=v; });
+}
+function salvarDados(){
+  PERSIST.forEach(k=>{ if($(k)) localStorage.setItem("pc_"+k, $(k).value); });
+}
+PERSIST.forEach(k=>{ const el=$(k); if(el) el.addEventListener("change", salvarDados); });
+carregarDados();
+
+// ---------- helpers ----------
+function brl(v){ return "R$ " + (Number(v)||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function parseMoney(s){ if(typeof s==="number")return s; s=(s||"").toString().replace("R$","").trim();
+  if(s.includes(","))s=s.replace(/\./g,"").replace(",","."); return parseFloat(s)||0; }
+function isoToBR(v){ if(!v)return ""; const p=v.split("-"); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:v; }
+const CATS=["Passagem","Locomocao","Refeicao","Hospedagem","Outros","Anexo"];
+const CAT_LABEL={Passagem:"Passagem",Locomocao:"Locomoção",Refeicao:"Refeição",Hospedagem:"Hospedagem",Outros:"Outros",Anexo:"📎 Só anexo"};
+
+// ---------- layout normal / km ----------
+document.querySelectorAll('input[name=layout]').forEach(r=> r.onchange = toggleLayout);
+function toggleLayout(){
+  const km = document.querySelector('input[name=layout]:checked').value==="km";
+  document.querySelectorAll('.km-only').forEach(e=> e.classList.toggle('hide', !km));
+}
+
+// ---------- câmera + OCR ----------
+$("btnFoto").onclick = ()=> $("file").click();
+$("file").onchange = e => { const fs=[...e.target.files]; e.target.value=""; if(fs.length) lerNotas(fs); };
+
+async function redimensionar(file){
+  const img = await createImageBitmap(file);
+  const max=1500, m=Math.max(img.width,img.height), f=m>max?max/m:1;
+  const c=document.createElement("canvas"); c.width=Math.round(img.width*f); c.height=Math.round(img.height*f);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return c;
+}
+
+async function lerNotas(files){
+  let worker = await Tesseract.createWorker('por');
+  for(let i=0;i<files.length;i++){
+    $("status").innerHTML = `<span class="spin"></span> Lendo nota ${i+1} de ${files.length}…`
+      + (i===0 ? " (a 1ª baixa o motor, aguarde)" : "");
+    try{
+      const canvas = await redimensionar(files[i]);
+      const img = canvas.toDataURL("image/jpeg", 0.8);
+      const { data } = await worker.recognize(canvas);
+      const ex = window.PC.extrair(data.text || "");
+      RECEIPTS.push({ img, data: ex.data||"", valor: ex.valor||0,
+                      categoria: ex.categoria, justificativa: "", texto: data.text });
+      render();
+    }catch(err){
+      RECEIPTS.push({ img:"", data:"", valor:0, categoria:"Outros", justificativa:"", texto:"", erro:String(err) });
+      render();
+    }
+  }
+  await worker.terminate();
+  $("status").innerHTML = `<span class="ok">✓ ${files.length} nota(s) lida(s).</span>`;
+}
+
+// ---------- tabela de revisão ----------
+function render(){
+  const box = $("notas"); box.innerHTML="";
+  RECEIPTS.forEach((r,i)=>{
+    const isAnexo = r.categoria==="Anexo";
+    const opts = CATS.map(c=>`<option value="${c}" ${c===r.categoria?"selected":""}>${CAT_LABEL[c]}</option>`).join("");
+    const el = document.createElement("div"); el.className="nota";
+    el.innerHTML = `
+      ${r.img?`<img src="${r.img}">`:`<div style="width:52px"></div>`}
+      <div class="campos">
+        <input placeholder="dd/mm/aaaa" value="${r.data||""}" onchange="RECEIPTS[${i}].data=this.value">
+        <select onchange="setCat(${i},this.value)">${opts}</select>
+        <input inputmode="decimal" ${isAnexo?"disabled placeholder='—'":`value="${(Number(r.valor)||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}"`} onchange="RECEIPTS[${i}].valor=parseMoney(this.value);recalc()">
+        <input class="fw" placeholder="${isAnexo?'ex: mapa da rota / pedágio':'justificativa'}" value="${r.justificativa||""}" onchange="RECEIPTS[${i}].justificativa=this.value">
+      </div>
+      <button class="btn-x" onclick="delNota(${i})">✕</button>`;
+    box.appendChild(el);
+  });
+  $("reviewCard").classList.toggle("hide", RECEIPTS.length===0);
+  $("btnGerar").disabled = RECEIPTS.length===0;
+  recalc();
+}
+function setCat(i,v){ RECEIPTS[i].categoria=v; render(); }
+function delNota(i){ RECEIPTS.splice(i,1); render(); }
+function recalc(){
+  const t = RECEIPTS.reduce((s,r)=> s + (r.categoria==="Anexo"?0:(Number(r.valor)||0)), 0);
+  $("total").textContent = brl(t);
+}
+
+// ---------- KM ----------
+function addKm(){ KM.push({data:"",ki:"",kf:"",just:""}); renderKm(); }
+function renderKm(){
+  const tb = $("kmTable").querySelector("tbody"); tb.innerHTML="";
+  const taxa = parseMoney($("km_taxa").value)||1.9;
+  KM.forEach((k,i)=>{
+    const rod = (parseMoney(k.kf)-parseMoney(k.ki))||0;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td><input placeholder="dd/mm" value="${k.data||""}" onchange="KM[${i}].data=this.value"></td>
+      <td><input inputmode="numeric" value="${k.ki||""}" onchange="KM[${i}].ki=this.value;renderKm()"></td>
+      <td><input inputmode="numeric" value="${k.kf||""}" onchange="KM[${i}].kf=this.value;renderKm()"></td>
+      <td>${rod>0?rod.toFixed(0):""}</td>
+      <td>${rod>0?brl(rod*taxa):""}</td>
+      <td><button class="btn-x" onclick="KM.splice(${i},1);renderKm()">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+$("km_taxa").addEventListener("change", ()=>{ renderKm(); salvarDados(); });
+
+// ---------- gerar PDF ----------
+$("btnGerar").onclick = gerar;
+async function gerar(){
+  salvarDados();
+  const btn=$("btnGerar"); btn.disabled=true; const old=btn.textContent; btn.textContent="Gerando…";
+  try{
+    const layout = document.querySelector('input[name=layout]:checked').value;
+    const dados = {
+      layout,
+      nome:$("nome").value, cpf:$("cpf").value, depto:$("depto").value,
+      destino:$("destino").value, objetivo:$("objetivo").value,
+      inicio:isoToBR($("inicio").value), termino:isoToBR($("termino").value),
+      banco:$("banco").value, agencia:$("agencia").value, conta:$("conta").value,
+      pix:$("pix").value, assinatura_nome:$("assinatura_nome").value,
+      adiantamento_data:isoToBR($("adiantamento_data").value),
+      adiantamento_valor:parseMoney($("adiantamento_valor").value),
+      km_taxa:parseMoney($("km_taxa").value)||1.9,
+      receipts:RECEIPTS, km:KM,
+    };
+    const bytes = await window.PC.gerarPDF(dados);
+    const blob = new Blob([bytes],{type:"application/pdf"});
+    const destino=(dados.destino||"VIAGEM").toUpperCase().replace(/\s+/g,"-");
+    let mesano=""; if(dados.inicio.includes("/")){const p=dados.inicio.split("/");mesano=`${p[1]}-${p[2]}`;}
+    const nome=`PRESTACAO DE CONTAS - ${destino} ${mesano}.pdf`.trim();
+    const file=new File([blob],nome,{type:"application/pdf"});
+    // iPhone: usa o menu Compartilhar (salvar em Arquivos, enviar, etc.)
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:nome});
+    }else{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=url; a.download=nome; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),4000);
+    }
+    $("status").innerHTML='<span class="ok">✓ PDF gerado!</span>';
+  }catch(e){ alert("Erro ao gerar PDF: "+e.message); }
+  btn.disabled=false; btn.textContent=old;
+}
+
+// service worker (offline)
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
